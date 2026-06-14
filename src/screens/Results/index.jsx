@@ -18,8 +18,19 @@ function useCountUp(target, dur = 1000) {
   return v;
 }
 
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
+  useEffect(() => {
+    const f = () => setM(window.innerWidth <= 768);
+    window.addEventListener('resize', f, { passive: true });
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return m;
+}
+
 export default function Results() {
   const { lastResult, params, history, saveToHistory, setScreen } = useStore();
+  const mobile = useIsMobile();
   const [savedAt, setSavedAt] = useState(0);
   const [highlightPhase, setHighlightPhase] = useState(null);
   // chart tools
@@ -111,8 +122,8 @@ export default function Results() {
         <div style={{ textAlign: 'center', padding: '24px 24px 12px' }}>
           <div style={eyebrow}>Максимальная высота</div>
           <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 14 }}>
-            <Odometer value={lastResult.maxHeight} />
-            <span style={{ fontFamily: F, fontSize: 28, color: '#555', fontWeight: 400 }}>метров</span>
+            <Odometer value={lastResult.maxHeight} fontSize={mobile ? 64 : 96} />
+            <span style={{ fontFamily: F, fontSize: mobile ? 20 : 28, color: '#555', fontWeight: 400 }}>метров</span>
           </div>
         </div>
         <div style={{ width: '100%', height: 2, background: '#4caf50', borderRadius: 2, marginBottom: 22 }} />
@@ -185,7 +196,7 @@ export default function Results() {
         )}
 
         {/* WHAT-IF + ENERGY */}
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 26 }}>
+        <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 14, flexWrap: 'wrap', marginBottom: 26 }}>
           <div style={{ ...glassCard, flex: '2 1 360px', padding: '14px 16px' }}>
             <div style={{ ...miniTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Sparkle /> Что если?</span>
@@ -224,19 +235,23 @@ export default function Results() {
         <div style={{ marginBottom: 26 }}>
           <div style={sectionTitle}>Фазы полёта</div>
           <div style={{ ...glassCard, overflow: 'hidden' }}>
-            <div style={{ ...tRow, ...tHead }}>
+            <div style={{ ...tRow, ...tHead, ...(mobile ? tRowMob : null) }}>
               <span style={tcNum}>#</span>
-              <span style={{ ...tc, flex: 1.6, textAlign: 'left' }}>Фаза</span>
-              <span style={tc}>Высота</span><span style={tc}>Скорость</span><span style={tc}>Время</span>
+              <span style={{ ...tc, flex: 1.6, textAlign: 'left', ...(mobile ? tcMob : null) }}>Фаза</span>
+              <span style={{ ...tc, ...(mobile ? tcMob : null) }}>{mobile ? 'Выс.' : 'Высота'}</span>
+              <span style={{ ...tc, ...(mobile ? tcMob : null) }}>{mobile ? 'Скор.' : 'Скорость'}</span>
+              <span style={{ ...tc, ...(mobile ? tcMob : null) }}>{mobile ? 'Вр.' : 'Время'}</span>
             </div>
             {lastResult.phases.map((ph, i) => {
               const active = highlightPhase === i + 1;
               return (
                 <div key={i} onMouseEnter={() => setHighlightPhase(i + 1)} onMouseLeave={() => setHighlightPhase(null)}
-                  style={{ ...tRow, borderLeft: `3px solid ${STRIPE[i + 1] || '#ccc'}`, background: active ? 'rgba(76,175,80,0.12)' : (i % 2 ? 'rgba(0,0,0,0.025)' : 'transparent'), transition: 'background 0.15s' }}>
+                  style={{ ...tRow, ...(mobile ? tRowMob : null), borderLeft: `3px solid ${STRIPE[i + 1] || '#ccc'}`, background: active ? 'rgba(76,175,80,0.12)' : (i % 2 ? 'rgba(0,0,0,0.025)' : 'transparent'), transition: 'background 0.15s' }}>
                   <span style={tcNum}><span style={{ ...numCircle, background: STRIPE[i + 1] || '#ccc' }}>{i + 1}</span></span>
-                  <span style={{ ...tcName, flex: 1.6 }}>{ph.name}</span>
-                  <span style={tcBody}>{ph.h} м</span><span style={tcBody}>{ph.v} м/с</span><span style={tcBody}>{ph.t} с</span>
+                  <span style={{ ...tcName, flex: 1.6, ...(mobile ? { fontSize: 11.5 } : null) }}>{ph.name}</span>
+                  <span style={{ ...tcBody, ...(mobile ? tcBodyMob : null) }}>{ph.h} м</span>
+                  <span style={{ ...tcBody, ...(mobile ? tcBodyMob : null) }}>{ph.v} м/с</span>
+                  <span style={{ ...tcBody, ...(mobile ? tcBodyMob : null) }}>{ph.t} с</span>
                 </div>
               );
             })}
@@ -322,12 +337,12 @@ function WifSlider({ label, value, min, max, step, unit, onChange }) {
     </div>
   );
 }
-function Odometer({ value }) {
+function Odometer({ value, fontSize = 96 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { const id = requestAnimationFrame(() => setMounted(true)); return () => cancelAnimationFrame(id); }, []);
   let dp = 0;
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'baseline', fontFamily: F, fontWeight: 800, fontSize: 96, color: '#1a3a1a', lineHeight: 1 }}>
+    <div style={{ display: 'inline-flex', alignItems: 'baseline', fontFamily: F, fontWeight: 800, fontSize, color: '#1a3a1a', lineHeight: 1 }}>
       {value.toFixed(1).split('').map((c, i) => {
         if (c < '0' || c > '9') return <span key={i} style={{ padding: '0 2px' }}>{c}</span>;
         const d = Number(c); const delay = dp * 0.08; dp++;
@@ -423,6 +438,9 @@ const tc = { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 700, letter
 const tcNum = { width: 34, flex: '0 0 34px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#999', fontFamily: F };
 const tcName = { flex: 1, textAlign: 'left', fontFamily: F, fontSize: 13, fontWeight: 600, color: '#1f3a22' };
 const tcBody = { flex: 1, textAlign: 'center', fontFamily: MONO, fontSize: 12, color: '#333' };
+const tRowMob = { padding: '8px 4px' };
+const tcMob = { fontSize: 11, letterSpacing: 0.3 };
+const tcBodyMob = { fontSize: 11 };
 const numCircle = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: '50%', color: '#fff', fontSize: 11, fontWeight: 700, fontFamily: F };
 const instrument = { display: 'flex', justifyContent: 'center', gap: 26, marginTop: 10, padding: '8px 0', background: 'rgba(0,0,0,0.03)', borderRadius: 10, fontFamily: MONO, fontSize: 13, color: '#2e7d32' };
 const intervalCard = { flex: '0 0 auto', minWidth: 180, background: 'rgba(255,255,255,0.88)', borderRadius: 12, padding: '12px 16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', animation: 'fadeInUp 0.2s cubic-bezier(0.25,0.46,0.45,0.94)' };
@@ -433,4 +451,4 @@ const ddList = { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 
 const resetBtn = { fontFamily: F, fontSize: 11.5, color: '#4a7a2c', background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.4)', borderRadius: 8, padding: '3px 10px', cursor: 'pointer', fontWeight: 600 };
 const emptyCta = { height: 54, padding: '0 40px', background: '#4a9e2f', color: '#fff', border: 'none', borderRadius: 100, fontSize: 15, fontWeight: 600, letterSpacing: 0.4, cursor: 'pointer', fontFamily: F, transition: 'transform 0.22s cubic-bezier(0.34,1.56,0.64,1), background 0.25s' };
 const btnPrimary = { position: 'relative', overflow: 'hidden', height: 50, background: '#4a9e2f', color: '#fff', border: 'none', borderRadius: 100, fontSize: 14, fontWeight: 600, letterSpacing: 0.4, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(74,158,47,0.4), inset 0 1px 0 rgba(255,255,255,0.18)', transition: 'transform 0.22s cubic-bezier(0.34,1.56,0.64,1), background 0.25s, box-shadow 0.25s' };
-const btnOutline = { height: 50, background: 'rgba(255,255,255,0.85)', color: '#3a7a28', border: '1.5px solid #4caf50', borderRadius: 100, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: F, backdropFilter: 'blur(8px)', transition: 'background 0.2s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1)' };
+const btnOutline = { height: 50, background: 'rgba(255,255,255,0.85)', color: '#3a7a28', border: '1.5px solid #4caf50', borderRadius: 100, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: F, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', transition: 'background 0.2s, transform 0.22s cubic-bezier(0.34,1.56,0.64,1)' };

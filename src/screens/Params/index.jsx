@@ -19,9 +19,20 @@ const FIELDS_RIGHT = [
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const decimals = (step) => (step < 0.1 ? 2 : step < 1 ? 1 : 0);
 
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
+  useEffect(() => {
+    const f = () => setM(window.innerWidth <= 768);
+    window.addEventListener('resize', f, { passive: true });
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return m;
+}
+
 export default function Params() {
   const { params, setParam, setScreen } = useStore();
   const [shake, setShake] = useState(false);
+  const mobile = useIsMobile();
   const chk = useMemo(() => checkInputs(params), [params]);
 
   const onLaunch = () => {
@@ -35,29 +46,45 @@ export default function Params() {
       <div style={bgStyle} />
       <PageLabel icon="gear" text="Параметры" />
 
-      <div style={contentStyle}>
-        <div style={midRow}>
-          <div style={colStyle}>
+      {mobile ? (
+        <div style={contentMobile}>
+          <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: shake ? 'rocketShake 0.4s ease-out' : 'none', flexShrink: 0 }}>
+            <RocketModel animate />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {FIELDS_LEFT.map(f => (
-              <ParamSlider key={f.id} field={f} value={params[f.id]} onChange={v => setParam(f.id, v)} />
+              <ParamSlider key={f.id} field={f} value={params[f.id]} onChange={v => setParam(f.id, v)} mobile />
             ))}
-          </div>
-
-          <div style={{ flex: '1 1 30%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 0 }}>
-            <div style={{ width: '100%', height: '100%', maxWidth: 360, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: shake ? 'rocketShake 0.4s ease-out' : 'none' }}>
-              <RocketModel animate />
-            </div>
-          </div>
-
-          <div style={colStyle}>
             {FIELDS_RIGHT.map(f => (
-              <ParamSlider key={f.id} field={f} value={params[f.id]} onChange={v => setParam(f.id, v)} />
+              <ParamSlider key={f.id} field={f} value={params[f.id]} onChange={v => setParam(f.id, v)} mobile />
             ))}
-            <MassCard value={params.dryMass + params.waterVol * 1000} />
+            <MassCard value={params.dryMass + params.waterVol * 1000} mobile />
           </div>
         </div>
+      ) : (
+        <div style={contentStyle}>
+          <div style={midRow}>
+            <div style={colStyle}>
+              {FIELDS_LEFT.map(f => (
+                <ParamSlider key={f.id} field={f} value={params[f.id]} onChange={v => setParam(f.id, v)} />
+              ))}
+            </div>
 
-      </div>
+            <div style={{ flex: '1 1 30%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minWidth: 0 }}>
+              <div style={{ width: '100%', height: '100%', maxWidth: 360, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: shake ? 'rocketShake 0.4s ease-out' : 'none' }}>
+                <RocketModel animate />
+              </div>
+            </div>
+
+            <div style={colStyle}>
+              {FIELDS_RIGHT.map(f => (
+                <ParamSlider key={f.id} field={f} value={params[f.id]} onChange={v => setParam(f.id, v)} />
+              ))}
+              <MassCard value={params.dryMass + params.waterVol * 1000} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={launchWrap}>
         {!chk.ok && <div style={msgErr}>{chk.hard}</div>}
@@ -97,6 +124,11 @@ export default function Params() {
         }
         @keyframes btnSheen { 0% { left: -100%; } 60% { left: 100%; } 100% { left: 100%; } }
         @keyframes rocketShake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-5px);} 75%{transform:translateX(5px);} }
+        @media (max-width: 768px) {
+          .pslider { height: 6px; }
+          .pslider::-webkit-slider-thumb { width: 22px; height: 22px; }
+          .pslider::-moz-range-thumb { width: 22px; height: 22px; }
+        }
       `}</style>
     </div>
   );
@@ -106,6 +138,7 @@ export default function Params() {
 const rootStyle = { position: 'relative', height: '100vh', width: '100%', overflow: 'hidden', background: '#ede8e0' };
 const bgStyle = { position: 'absolute', inset: 0, backgroundImage: 'url(/images/param_phone.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', opacity: 0.62, filter: 'blur(1px)', zIndex: 0 };
 const contentStyle = { position: 'relative', zIndex: 2, height: '100%', display: 'flex', flexDirection: 'column', padding: '52px clamp(10px, 3vw, 32px) 150px', maxWidth: 1280, margin: '0 auto', boxSizing: 'border-box' };
+const contentMobile = { position: 'relative', zIndex: 2, height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', gap: 12, padding: '52px 12px 184px', maxWidth: 540, margin: '0 auto', boxSizing: 'border-box' };
 const midRow = { flex: '1 1 auto', display: 'flex', gap: 'clamp(8px, 1.5vw, 18px)', minHeight: 0, alignItems: 'stretch' };
 const colStyle = { flex: '1 1 35%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 'clamp(6px, 1.2vh, 12px)', minWidth: 0 };
 const launchWrap = { position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(90px + env(safe-area-inset-bottom))', zIndex: 50, width: 312, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 };
@@ -113,7 +146,7 @@ const launchBtn = { position: 'relative', overflow: 'hidden', width: 312, height
 const msgErr = { color: '#c62828', background: 'rgba(255,255,255,0.88)', padding: '5px 12px', borderRadius: 10, fontSize: 12, textAlign: 'center', fontWeight: 500, boxShadow: '0 2px 10px rgba(0,0,0,0.12)' };
 
 /* ---------- ParamSlider ---------- */
-function ParamSlider({ field, value, onChange }) {
+function ParamSlider({ field, value, onChange, mobile }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const pct = ((value - field.min) / (field.max - field.min)) * 100;
@@ -126,11 +159,11 @@ function ParamSlider({ field, value, onChange }) {
   };
 
   return (
-    <div style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+    <div style={mobile ? cardStyleMob : cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: mobile ? 6 : 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1f3a22', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{field.label}</span>
+            <span style={{ fontSize: mobile ? 11 : 12.5, fontWeight: 600, color: '#1f3a22', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{field.label}</span>
             {editing ? (
               <input
                 type="number"
@@ -160,36 +193,37 @@ function ParamSlider({ field, value, onChange }) {
             style={{ background: `linear-gradient(to right, #4caf50 0%, #4caf50 ${pct}%, rgba(0,0,0,0.12) ${pct}%, rgba(0,0,0,0.12) 100%)` }}
           />
         </div>
-        <Widget type={field.widget} value={value} min={field.min} max={field.max} />
+        <Widget type={field.widget} value={value} min={field.min} max={field.max} size={mobile ? 36 : 56} />
       </div>
     </div>
   );
 }
 
 const cardStyle = { background: 'rgba(255,255,255,0.82)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.6)', borderRadius: 16, padding: '10px 12px', boxShadow: '0 2px 16px rgba(0,0,0,0.08)' };
+const cardStyleMob = { ...cardStyle, borderRadius: 12, padding: '10px 12px', minWidth: 0 };
 
 /* ---------- MassCard (auto-computed, no slider) ---------- */
-function MassCard({ value }) {
+function MassCard({ value, mobile }) {
   return (
-    <div style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+    <div style={mobile ? { ...cardStyleMob, background: 'rgba(245,247,243,0.82)' } : cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: mobile ? 6 : 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1f3a22' }}>Общая масса</span>
-            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 14, color: '#4caf50', fontWeight: 700 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6, gap: 6 }}>
+            <span style={{ fontSize: mobile ? 11 : 12.5, fontWeight: 600, color: '#1f3a22' }}>Общая масса</span>
+            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 14, color: '#4caf50', fontWeight: 700, whiteSpace: 'nowrap' }}>
               {Math.round(value)}<span style={{ fontSize: 10, marginLeft: 2, color: '#7a9a7e', fontWeight: 500 }}>г</span>
             </span>
           </div>
-          <div style={{ fontSize: 10.5, color: '#7a9a7e' }}>рассчитывается автоматически</div>
+          <div style={{ fontSize: 10.5, color: '#7a9a7e' }}>{mobile ? 'авто' : 'рассчитывается автоматически'}</div>
         </div>
-        <Widget type="weight" value={value} min={50} max={5000} />
+        <Widget type="weight" value={value} min={50} max={5000} size={mobile ? 36 : 56} />
       </div>
     </div>
   );
 }
 
 /* ---------- Animated canvas widgets ---------- */
-function Widget({ type, value, min, max }) {
+function Widget({ type, value, min, max, size = 56 }) {
   const ref = useRef(null);
   const valRef = useRef({ value, min, max });
   valRef.current = { value, min, max };
@@ -198,7 +232,7 @@ function Widget({ type, value, min, max }) {
     const canvas = ref.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const SIZE = 56;
+    const SIZE = size;
     canvas.width = SIZE * dpr; canvas.height = SIZE * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
@@ -213,9 +247,9 @@ function Widget({ type, value, min, max }) {
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [type]);
+  }, [type, size]);
 
-  return <canvas ref={ref} style={{ width: 56, height: 56, flex: '0 0 56px' }} />;
+  return <canvas ref={ref} style={{ width: size, height: size, flex: `0 0 ${size}px` }} />;
 }
 
 const lerpColor = (f) => {

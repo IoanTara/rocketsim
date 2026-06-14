@@ -13,6 +13,12 @@ export default function ResultsChart({ result, whatIfResult = null, compareResul
   const [hover, setHover] = useState(null);
   const [pending, setPending] = useState(null); // { px, py, defT }
   const [draft, setDraft] = useState('');
+  const [chartH, setChartH] = useState(typeof window !== 'undefined' && window.innerWidth <= 768 ? 220 : 300);
+  useEffect(() => {
+    const f = () => setChartH(window.innerWidth <= 768 ? 220 : 300);
+    window.addEventListener('resize', f, { passive: true });
+    return () => window.removeEventListener('resize', f);
+  }, []);
 
   const FLAG_COLORS = ['#2e7d32', '#1565c0', '#e65100', '#6a1b9a'];
   const maxTime = result && result.points.length ? result.points[result.points.length - 1].t : 0;
@@ -93,7 +99,8 @@ export default function ResultsChart({ result, whatIfResult = null, compareResul
       ctx.restore();
 
       // grid
-      ctx.textAlign = 'left'; ctx.font = '11px var(--font-body, sans-serif)'; ctx.setLineDash([3, 4]);
+      const mob = W < 500;
+      ctx.textAlign = 'left'; ctx.font = `${mob ? 9 : 11}px var(--font-body, sans-serif)`; ctx.setLineDash([3, 4]);
       for (let i = 0; i <= 4; i++) {
         const y = pad.t + (ch / 4) * i;
         ctx.strokeStyle = 'rgba(0,0,0,0.05)'; ctx.lineWidth = 1;
@@ -140,15 +147,28 @@ export default function ResultsChart({ result, whatIfResult = null, compareResul
       }
 
       if (progress > 0.98) {
-        marker(ctx, xOf(pts[0].t), yOf(0), 3.5, '#9e9e9e'); label(ctx, 'Старт', xOf(pts[0].t) + 6, yOf(0) - 8, 'left');
+        const fs = mob ? 10 : 10.5;
+        const sx = xOf(pts[0].t), sy = yOf(0);
         const bx = xOf(pts[boIdx].t), by = yOf(pts[boIdx].y);
+        const ax = xOf(pts[apIdx].t), ay = yOf(pts[apIdx].y);
+        const close = Math.abs(bx - sx) < 60; // labels would collide
+
+        // Старт — if cramped, drop below the point instead of above
+        marker(ctx, sx, sy, 3.5, '#9e9e9e');
+        clab(ctx, 'Старт', sx + 6, close ? sy + 13 : sy - 8, 'left', false, fs, pad, cw);
+
+        // Конец тяги — dashed guide + label (shorten on narrow, nudge right when cramped)
         ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
-        marker(ctx, bx, by, 4, '#f57c00'); label(ctx, `Конец тяги ${pts[boIdx].y.toFixed(1)}м`, bx + 6, by - 8, 'left');
-        const ax = xOf(pts[apIdx].t), ay = yOf(pts[apIdx].y);
+        marker(ctx, bx, by, 4, '#f57c00');
+        const boTxt = `${mob ? 'Кон. тяги' : 'Конец тяги'} ${pts[boIdx].y.toFixed(1)}м`;
+        clab(ctx, boTxt, bx + (close ? 12 : 6), by - 8, 'left', false, fs, pad, cw);
+
+        // Апогей
         const pulse = 6 + Math.sin(now / 350) * 2.2;
         ctx.fillStyle = 'rgba(76,175,80,0.25)'; ctx.beginPath(); ctx.arc(ax, ay, pulse + 4, 0, Math.PI * 2); ctx.fill();
-        marker(ctx, ax, ay, 6, '#2e7d32'); label(ctx, `Апогей ${pts[apIdx].y.toFixed(1)}м`, ax, ay - 14, 'center', true);
+        marker(ctx, ax, ay, 6, '#2e7d32');
+        clab(ctx, `Апогей ${pts[apIdx].y.toFixed(1)}м`, ax, ay - 14, 'center', true, fs, pad, cw);
       }
 
       // play rocket
@@ -267,7 +287,7 @@ export default function ResultsChart({ result, whatIfResult = null, compareResul
   if (!result) return null;
   const hp = hover && result.points[hover.i];
   return (
-    <div ref={wrapRef} style={{ position: 'relative', width: '100%', height: 300, cursor: flagMode ? 'crosshair' : 'default' }}
+    <div ref={wrapRef} style={{ position: 'relative', width: '100%', height: chartH, cursor: flagMode ? 'crosshair' : 'default' }}
       onMouseMove={onMove} onMouseLeave={onLeave} onClick={onClick}>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
       {hp && !playing && !flagMode && (
@@ -326,6 +346,14 @@ function marker(ctx, x, y, r, color) {
   ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 }
-function label(ctx, text, x, y, align, bold) {
-  ctx.fillStyle = '#1a2e1c'; ctx.font = `${bold ? 700 : 600} 10.5px var(--font-body, sans-serif)`; ctx.textAlign = align; ctx.fillText(text, x, y);
+function clab(ctx, text, x, y, align, bold, fs, pad, cw) {
+  ctx.fillStyle = '#1a2e1c';
+  ctx.font = `${bold ? 700 : 600} ${fs}px var(--font-body, sans-serif)`;
+  ctx.textAlign = align;
+  const w = ctx.measureText(text).width;
+  const left = pad.l + 2, right = pad.l + cw - 2;
+  if (align === 'left') x = Math.min(Math.max(x, left), Math.max(left, right - w));
+  else if (align === 'center') x = Math.min(Math.max(x, left + w / 2), Math.max(left + w / 2, right - w / 2));
+  else x = Math.min(Math.max(x, left + w), right);
+  ctx.fillText(text, x, y);
 }

@@ -22,8 +22,19 @@ function plural(n, one, few, many) {
   return many;
 }
 
+function useIsMobile() {
+  const [m, setM] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
+  useEffect(() => {
+    const f = () => setM(window.innerWidth <= 768);
+    window.addEventListener('resize', f, { passive: true });
+    return () => window.removeEventListener('resize', f);
+  }, []);
+  return m;
+}
+
 export default function History() {
   const { history, deleteFromHistory, setScreen, setResult, setParams } = useStore();
+  const mobile = useIsMobile();
 
   const runs = [...history].sort((a, b) => a.id - b.id);
   const baseMaxY = runs.reduce((m, r) => Math.max(m, r.result.maxHeight), 0) || 1;
@@ -70,11 +81,11 @@ export default function History() {
   return (
     <div style={root}>
       <StarField />
-      <div style={horizonFog} />
+      <div style={{ ...horizonFog, height: mobile ? '55vh' : '58vh' }} />
       <PageLabel icon="history" text="История" dark />
 
       {/* ───── TOP: CHART ───── */}
-      <div style={topBlock}>
+      <div style={{ ...topBlock, height: mobile ? '55vh' : '58vh' }}>
         {runs.length > 0 && (
           <>
             <Chart runs={runs} baseMaxY={baseMaxY} maxT={maxT} yZoom={yZoom} flashUntil={flashUntil} recordId={recordId}
@@ -86,7 +97,7 @@ export default function History() {
       </div>
 
       {/* ───── BOTTOM: CARDS ───── */}
-      <div style={bottomBlock}>
+      <div style={{ ...bottomBlock, height: mobile ? '45vh' : '42vh' }}>
         <div style={headerLine}>
           история полётов{runs.length > 0 ? ` · ${runs.length} ${plural(runs.length, 'запуск', 'запуска', 'запусков')}` : ''}
         </div>
@@ -100,7 +111,7 @@ export default function History() {
                 style={{ animation: `cardIn 0.5s ${EASE} both`, animationDelay: `${i * 60}ms`, flexShrink: 0 }}>
                 <div className="gc-float" style={{ animationDuration: `${4.5 + (i % 4) * 0.7}s`, animationDelay: `${(i % 5) * 0.4}s` }}>
                   <GlassCard
-                    run={r} num={i + 1}
+                    run={r} num={i + 1} width={mobile ? 140 : 160}
                     record={r.id === recordId}
                     active={r.id === selectedId}
                     onOpen={() => { setSelectedId(r.id); openRun(r); }}
@@ -175,6 +186,7 @@ export default function History() {
         .zoom-label { color: rgba(255,255,255,0.25); font-size: 9px; letter-spacing: 1px; text-align: center; padding: 2px 0; font-family: ${MONO}; overflow: hidden; }
         .zoom-label > span { display: inline-block; animation: zlFlip 0.22s ${EASE}; }
         @keyframes zlFlip { 0% { transform: translateY(-8px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        @media (max-width: 768px) { .zoom-btn { width: 40px; height: 40px; font-size: 22px; } }
 
         /* ---- empty-state button (transparent, with effects) ---- */
         .hist-empty-btn { position: relative; overflow: hidden; transition: transform 0.22s ${EASE}, background 0.25s ${EASE}, border-color 0.25s ${EASE}, box-shadow 0.25s ${EASE}, letter-spacing 0.25s ${EASE}; }
@@ -477,7 +489,7 @@ const Scroller = React.forwardRef(function Scroller({ children }, ref) {
 });
 
 /* ───────────────────────── GLASS CARD ───────────────────────── */
-function GlassCard({ run, num, record, active, onOpen, onDelete }) {
+function GlassCard({ run, num, width = 160, record, active, onOpen, onDelete }) {
   const { result } = run;
   const heightColor = active ? 'rgba(76,175,80,0.95)' : (record ? 'rgba(255,215,0,0.9)' : 'rgba(255,255,255,0.92)');
   const glow = active ? '0 0 14px rgba(76,175,80,0.5)' : (record ? '0 0 14px rgba(255,215,0,0.4)' : 'none');
@@ -487,7 +499,7 @@ function GlassCard({ run, num, record, active, onOpen, onDelete }) {
     : (record ? '0 0 20px rgba(255,215,0,0.08), inset 0 1px 0 rgba(255,255,255,0.08)' : 'inset 0 1px 0 rgba(255,255,255,0.06)');
   return (
     <div className="glass-card" onClick={onOpen} style={{
-      width: 162, boxSizing: 'border-box', cursor: 'pointer',
+      width, boxSizing: 'border-box', cursor: 'pointer',
       background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
       border, borderRadius: 16, padding: '14px 16px 12px', fontFamily: F, boxShadow: shadow,
     }}>
