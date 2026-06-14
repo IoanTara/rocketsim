@@ -197,7 +197,7 @@ export default function Results() {
 
         {/* WHAT-IF + ENERGY */}
         <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 14, flexWrap: 'wrap', marginBottom: 26 }}>
-          <div style={{ ...glassCard, flex: '2 1 360px', padding: '14px 16px' }}>
+          <div style={{ ...glassCard, flex: mobile ? '0 0 auto' : '2 1 360px', alignSelf: mobile ? 'stretch' : undefined, padding: '14px 16px' }}>
             <div style={{ ...miniTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Sparkle /> Что если?</span>
               {wifChanged && <button style={resetBtn} onClick={() => setWif({ pressure: params.pressure, waterVol: params.waterVol })}>Сбросить</button>}
@@ -218,7 +218,7 @@ export default function Results() {
             </div>
           </div>
 
-          <div style={{ ...glassCard, flex: '1 1 240px', padding: '14px 16px' }}>
+          <div style={{ ...glassCard, flex: mobile ? '0 0 auto' : '1 1 240px', alignSelf: mobile ? 'stretch' : undefined, padding: '14px 16px' }}>
             <div style={miniTitle}><span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><BoltIcon small /> Энергия</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 6 }}>
               <EnergyPie segments={energySegs} />

@@ -147,28 +147,64 @@ export default function ResultsChart({ result, whatIfResult = null, compareResul
       }
 
       if (progress > 0.98) {
-        const fs = mob ? 10 : 10.5;
+        const fs = mob ? 9 : 10.5;
+        const plotL = pad.l, plotR = pad.l + cw, plotT = pad.t, plotB = pad.t + ch;
         const sx = xOf(pts[0].t), sy = yOf(0);
         const bx = xOf(pts[boIdx].t), by = yOf(pts[boIdx].y);
         const ax = xOf(pts[apIdx].t), ay = yOf(pts[apIdx].y);
-        const close = Math.abs(bx - sx) < 60; // labels would collide
+        const drawn = []; // placed label bboxes for collision checks
 
-        // Старт — if cramped, drop below the point instead of above
-        marker(ctx, sx, sy, 3.5, '#9e9e9e');
-        clab(ctx, 'Старт', sx + 6, close ? sy + 13 : sy - 8, 'left', false, fs, pad, cw);
+        // collision-aware label placement; returns true if placed
+        const place = (text, px, py, prefs, bold) => {
+          ctx.font = `${bold ? 700 : 600} ${fs}px var(--font-body, sans-serif)`;
+          const tw = ctx.measureText(text).width, th = fs + 3, gap = 9;
+          for (const pos of prefs) {
+            let x, y, align;
+            if (pos === 'top') { x = px; y = py - gap; align = 'center'; }
+            else if (pos === 'bottom') { x = px; y = py + gap + th - 4; align = 'center'; }
+            else if (pos === 'left') { x = px - gap; y = py + th / 2 - 3; align = 'right'; }
+            else { x = px + gap; y = py + th / 2 - 3; align = 'left'; }
+            let x1 = align === 'center' ? x - tw / 2 : align === 'right' ? x - tw : x;
+            // clamp horizontally into plot
+            if (x1 < plotL + 2) { const d = plotL + 2 - x1; x += d; x1 += d; }
+            let x2 = x1 + tw;
+            if (x2 > plotR - 2) { const d = x2 - (plotR - 2); x -= d; x1 -= d; x2 -= d; }
+            const y1 = y - th + 3, y2 = y + 3;
+            if (y1 < plotT + 1 || y2 > plotB - 1) continue; // off plot vertically
+            if (drawn.some(b => !(x2 < b.x1 || x1 > b.x2 || y2 < b.y1 || y1 > b.y2))) continue; // collision
+            drawn.push({ x1, y1, x2, y2 });
+            ctx.textAlign = align; ctx.fillStyle = '#1a2e1c'; ctx.fillText(text, x, y);
+            return true;
+          }
+          return false;
+        };
 
-        // Конец тяги — dashed guide + label (shorten on narrow, nudge right when cramped)
+        // Старт — marker only, no text (obvious bottom-left origin)
+        marker(ctx, sx, sy, mob ? 4 : 5, '#9e9e9e');
+
+        // burnout marker + dashed guide
         ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, pad.t + ch); ctx.stroke(); ctx.setLineDash([]);
-        marker(ctx, bx, by, 4, '#f57c00');
-        const boTxt = `${mob ? 'Кон. тяги' : 'Конец тяги'} ${pts[boIdx].y.toFixed(1)}м`;
-        clab(ctx, boTxt, bx + (close ? 12 : 6), by - 8, 'left', false, fs, pad, cw);
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, plotB); ctx.stroke(); ctx.setLineDash([]);
+        marker(ctx, bx, by, mob ? 4 : 4, '#f57c00');
 
-        // Апогей
+        // apogee marker + pulse halo
         const pulse = 6 + Math.sin(now / 350) * 2.2;
-        ctx.fillStyle = 'rgba(76,175,80,0.25)'; ctx.beginPath(); ctx.arc(ax, ay, pulse + 4, 0, Math.PI * 2); ctx.fill();
-        marker(ctx, ax, ay, 6, '#2e7d32');
-        clab(ctx, `Апогей ${pts[apIdx].y.toFixed(1)}м`, ax, ay - 14, 'center', true, fs, pad, cw);
+        ctx.fillStyle = 'rgba(76,175,80,0.25)'; ctx.beginPath(); ctx.arc(ax, ay, (mob ? 2 : 4) + pulse, 0, Math.PI * 2); ctx.fill();
+        marker(ctx, ax, ay, mob ? 4 : 6, '#2e7d32');
+
+        // labels — apogee has priority, then burnout (avoids apogee)
+        const apVal = `${pts[apIdx].y.toFixed(1)}м`;
+        const nearTop = ay - plotT < 26;
+        place(mob ? apVal : `Апогей ${apVal}`, ax, ay,
+          nearTop ? ['bottom', 'top', 'right', 'left'] : ['top', 'bottom', 'right', 'left'], true);
+
+        const boVal = `${pts[boIdx].y.toFixed(1)}м`;
+        const lowerHalf = by > plotT + ch / 2;
+        const nearLeft = bx - plotL < 100;
+        const boPrefs = nearLeft
+          ? (lowerHalf ? ['right', 'bottom', 'top'] : ['right', 'top', 'bottom'])
+          : (lowerHalf ? ['bottom', 'top', 'right', 'left'] : ['top', 'bottom', 'right', 'left']);
+        place(mob ? boVal : `Кон. тяги ${boVal}`, bx, by, boPrefs, false);
       }
 
       // play rocket
@@ -345,15 +381,4 @@ function drawRocket(ctx, x, y, ang) {
 function marker(ctx, x, y, r, color) {
   ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-}
-function clab(ctx, text, x, y, align, bold, fs, pad, cw) {
-  ctx.fillStyle = '#1a2e1c';
-  ctx.font = `${bold ? 700 : 600} ${fs}px var(--font-body, sans-serif)`;
-  ctx.textAlign = align;
-  const w = ctx.measureText(text).width;
-  const left = pad.l + 2, right = pad.l + cw - 2;
-  if (align === 'left') x = Math.min(Math.max(x, left), Math.max(left, right - w));
-  else if (align === 'center') x = Math.min(Math.max(x, left + w / 2), Math.max(left + w / 2, right - w / 2));
-  else x = Math.min(Math.max(x, left + w), right);
-  ctx.fillText(text, x, y);
 }
